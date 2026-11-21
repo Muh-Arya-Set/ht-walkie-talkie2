@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#070b12" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <title>HT-MESH Tactical PTT</title>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg: #070b12;
+      --panel: #101726;
+      --panel-dark: #060911;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --rx: #00ff9d;
+      --tx: #ff3b5c;
+      --warn: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Roboto, monospace;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 14px;
+    }
+
+    .radio-unit {
+      width: 100%;
+      max-width: 420px;
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      gap: 8px;
+    }
+
+    .brand {
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-install {
+      display: none;
+      background: rgba(0, 255, 157, 0.14);
+      border: 1px solid var(--rx);
+      color: var(--rx);
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 4px 9px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .led-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .led-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #475569;
+      transition: 0.2s;
+    }
+
+    .led-dot.online { background: var(--rx); box-shadow: 0 0 8px var(--rx); }
+    .led-dot.tx { background: var(--tx); box-shadow: 0 0 10px var(--tx); }
+    .led-dot.busy { background: var(--warn); box-shadow: 0 0 10px var(--warn); }
+
+    .lcd-screen {
+      background: var(--panel-dark);
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .lcd-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 1px dashed #1e293b;
+      padding-bottom: 8px;
+    }
+
+    .ch-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+
+    .ch-value {
+      font-size: 1.55rem;
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: 1.5px;
+      line-height: 1.1;
+    }
+
+    .unit-info {
+      text-align: right;
+    }
+
+    .unit-id {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--rx);
+    }
+
+    .unit-count {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .roster-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 26px;
+      align-items: center;
+    }
+
+    .member-chip {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: #131c2e;
+      border: 1px solid #24324d;
+      color: #94a3b8;
+      transition: 0.15s;
+    }
+
+    .member-chip.self {
+      border-color: rgba(56, 189, 248, 0.4);
+      color: var(--accent);
+    }
+
+    .member-chip.speaking {
+      background: rgba(0, 255, 157, 0.18);
+      border-color: var(--rx);
+      color: var(--rx);
+      box-shadow: 0 0 10px rgba(0, 255, 157, 0.25);
+    }
+
+    .status-banner {
+      text-align: center;
+      padding: 8px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 0.82rem;
+      letter-spacing: 0.8px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      transition: 0.15s;
+    }
+
+    .status-banner.rx-active {
+      background: rgba(0, 255, 157, 0.15);
+      color: var(--rx);
+      border: 1px solid rgba(0, 255, 157, 0.4);
+    }
+
+    .status-banner.tx-active {
+      background: rgba(255, 59, 92, 0.15);
+      color: var(--tx);
+      border: 1px solid rgba(255, 59, 92, 0.4);
+    }
+
+    .status-banner.err-active {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warn);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .preset-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .preset-btn {
+      background: #0b111e;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 4px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+
+    .preset-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .join-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 6px;
+    }
+
+    input {
+      width: 100%;
+      background: var(--panel-dark);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-join {
+      background: var(--accent);
+      color: #05080f;
+      border: none;
+      padding: 0 14px;
+      border-radius: 9px;
+      font-weight: 800;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .btn-join:active {
+      transform: scale(0.96);
+    }
+
+    .ptt-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .ptt-btn {
+      width: 164px;
+      height: 164px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #1e293b, #090d16);
+      border: 4px solid #334155;
+      color: var(--text);
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.08);
+      transition: transform 0.08s, border-color 0.15s, box-shadow 0.15s;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .ptt-btn span {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .ptt-btn.transmitting {
+      transform: scale(0.94);
+      border-color: var(--tx);
+      color: var(--tx);
+      box-shadow: 0 0 32px rgba(255, 59, 92, 0.45), inset 0 0 15px rgba(255, 59, 92, 0.3);
+    }
+
+    .ptt-btn.locked-rx {
+      border-color: var(--warn);
+      color: var(--warn);
+      opacity: 0.75;
+    }
+
+    .ptt-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    .hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="radio-unit">
+    <div class="header">
+      <div class="brand">HT-MESH // PTT</div>
+      <div class="header-actions">
+        <button id="installBtn" class="btn-install">+ INSTALL APP</button>
+        <div class="led-badge">
+          <div id="ledDot" class="led-dot"></div>
+          <span id="netStatus">OFFLINE</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="lcd-screen">
+      <div class="lcd-top">
+        <div>
+          <div class="ch-label">SALURAN FREKUENSI</div>
+          <div id="activeChannelDisplay" class="ch-value">---</div>
+        </div>
+        <div class="unit-info">
+          <div id="myUnitDisplay" class="unit-id">BELUM MASUK</div>
+          <div id="memberCountDisplay" class="unit-count">0 UNIT AKTIF</div>
+        </div>
+      </div>
+
+      <div id="rosterBox" class="roster-box">
+        <span style="font-size: 0.72rem; color: var(--muted);">Pilih channel & tekan GABUNG...</span>
+      </div>
+
+      <div id="statusBanner" class="status-banner">RADIO STANDBY</div>
+    </div>
+
+    <div class="preset-row">
+      <button class="preset-btn active" data-ch="CH-01">CH-01</button>
+      <button class="preset-btn" data-ch="CH-02">CH-02</button>
+      <button class="preset-btn" data-ch="CH-03">CH-03</button>
+      <button class="preset-btn" data-ch="CH-04">CH-04</button>
+    </div>
+
+    <div class="join-grid">
+      <input type="text" id="channelInput" value="CH-01" placeholder="NAMA CHANNEL" maxlength="12" />
+      <input type="text" id="callsignInput" placeholder="CALLSIGN (OPSIONAL)" maxlength="10" />
+      <button id="joinBtn" class="btn-join">GABUNG</button>
+    </div>
+
+    <div class="ptt-wrapper">
+      <button id="pttBtn" class="ptt-btn" disabled>
+        TAHAN BICARA
+        <span id="pttSubtext">PUSH TO TALK</span>
+      </button>
+      <p class="hint">Maks. 8 unit per channel. Otomatis mengunci saat unit lain bicara.</p>
+    </div>
+  </div>
+
+  <div id="audioPool"></div>
+
+  <script>
+    // Registrasi Service Worker untuk PWA / WebAPK Android
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    // Tangkap event Install App di Chrome Android
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('installBtn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'inline-block';
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        installBtn.style.display = 'none';
+      }
+      deferredPrompt = null;
+    });
+
+    const MAX_SLOTS = 8;
+    const PEER_CONFIG = {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      }
+    };
+
+    let peer = null;
+    let localStream = null;
+    let currentChannel = '';
+    let mySlot = 0;
+    let myCallsign = '';
+    let isTransmitting = false;
+    let activeSpeakerPeerId = null;
+    let rxSafetyTimer = null;
+    let audioCtx = null;
+
+    const activePeers = new Map();
+    const pendingOutbound = new Map();
+
+    const ledDot = document.getElementById('ledDot');
+    const netStatus = document.getElementById('netStatus');
+    const activeChannelDisplay = document.getElementById('activeChannelDisplay');
+    const myUnitDisplay = document.getElementById('myUnitDisplay');
+    const memberCountDisplay = document.getElementById('memberCountDisplay');
+    const rosterBox = document.getElementById('rosterBox');
+    const statusBanner = document.getElementById('statusBanner');
+    const channelInput = document.getElementById('channelInput');
+    const callsignInput = document.getElementById('callsignInput');
+    const joinBtn = document.getElementById('joinBtn');
+    const pttBtn = document.getElementById('pttBtn');
+    const pttSubtext = document.getElementById('pttSubtext');
+    const audioPool = document.getElementById('audioPool');
+    const presetBtns = document.querySelectorAll('.preset-btn');
+
+    function playRadioTone(type) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        if (type === 'start') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(920, now);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+          osc.start(now);
+          osc.stop(now + 0.055);
+        } else if (type === 'roger') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1250, now);
+          osc.frequency.setValueAtTime(1650, now + 0.07);
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        }
+      } catch (e) {}
+    }
+
+    async function ensureMicrophone() {
+      if (localStream) return true;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatusError('HARUS DIBUKA VIA HTTPS / LOCALHOST');
+        return false;
+      }
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: false
+        });
+        setMicActive(false);
+        return true;
+      } catch (err) {
+        setStatusError('IZIN MIKROFON DITOLAK');
+        return false;
+      }
+    }
+
+    function setMicActive(enabled) {
+      if (!localStream) return;
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = enabled;
+      });
+    }
+
+    function setStatusError(msg) {
+      netStatus.textContent = 'ERROR';
+      ledDot.className = 'led-dot';
+      statusBanner.textContent = msg;
+      statusBanner.className = 'status-banner err-active';
+    }
+
+    function resetRxState() {
+      activeSpeakerPeerId = null;
+      if (rxSafetyTimer) {
+        clearTimeout(rxSafetyTimer);
+        rxSafetyTimer = null;
+      }
+      if (!isTransmitting) {
+        statusBanner.textContent = 'STANDBY - SALURAN AMAN';
+        statusBanner.className = 'status-banner';
+        ledDot.className = 'led-dot online';
+        pttBtn.classList.remove('locked-rx');
+        pttSubtext.textContent = 'PUSH TO TALK';
+      }
+      renderRoster();
+    }
+
+    function leaveCurrentChannel() {
+      isTransmitting = false;
+      activeSpeakerPeerId = null;
+      if (rxSafetyTimer) clearTimeout(rxSafetyTimer);
+      setMicActive(false);
+
+      pendingOutbound.forEach((item) => {
+        if (item.conn) item.conn.close();
+        if (item.call) item.call.close();
+      });
+      pendingOutbound.clear();
+
+      activePeers.forEach((_, remoteId) => removePeer(remoteId, false));
+      activePeers.clear();
+      audioPool.innerHTML = '';
+
+      if (peer) {
+        peer.destroy();
+        peer = null;
+      }
+    }
+
+    async function joinChannel(rawChannel) {
+      const micReady = await ensureMicrophone();
+      if (!micReady) return;
+
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      document.querySelectorAll('#audioPool audio').forEach(el => {
+        el.play().catch(() => {});
+      });
+
+      const cleanChannel = rawChannel.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'CH-01';
+      channelInput.value = cleanChannel;
+
+      leaveCurrentChannel();
+      currentChannel = cleanChannel;
+      activeChannelDisplay.textContent = cleanChannel;
+      netStatus.textContent = 'SCANNING...';
+      ledDot.className = 'led-dot busy';
+      statusBanner.textContent = 'MENCARI SLOT FREKUENSI...';
+      statusBanner.className = 'status-banner';
+      pttBtn.disabled = true;
+
+      updatePresetHighlight(cleanChannel);
+      tryClaimSlot(cleanChannel, 1);
+    }
+
+    function tryClaimSlot(channel, slot) {
+      if (slot > MAX_SLOTS) {
+        setStatusError(`CHANNEL ${channel} PENUH (MAKS ${MAX_SLOTS} UNIT)`);
+        return;
+      }
+
+      const candidateId = `PTTNET_${channel}_S${slot}`;
+      const tempPeer = new Peer(candidateId, PEER_CONFIG);
+      let isOpened = false;
+
+      tempPeer.on('open', () => {
+        isOpened = true;
+        peer = tempPeer;
+        mySlot = slot;
+        const customName = callsignInput.value.trim().toUpperCase();
+        myCallsign = customName || `UNIT-0${slot}`;
+
+        myUnitDisplay.textContent = myCallsign;
+        ledDot.className = 'led-dot online';
+        netStatus.textContent = 'ONLINE';
+        pttBtn.disabled = false;
+        statusBanner.textContent = 'STANDBY - SALURAN AMAN';
+        statusBanner.className = 'status-banner';
+
+        setupPeerListeners();
+        renderRoster();
+
+        for (let s = 1; s <= MAX_SLOTS; s++) {
+          if (s === mySlot) continue;
+          const targetId = `PTTNET_${channel}_S${s}`;
+          connectToPeer(targetId, s);
+        }
+      });
+
+      tempPeer.on('error', (err) => {
+        if (!isOpened) {
+          tempPeer.destroy();
+          if (err.type === 'unavailable-id') {
+            tryClaimSlot(channel, slot + 1);
+          } else {
+            setStatusError(`GAGAL KONEKSI (${err.type.toUpperCase()})`);
+          }
+          return;
+        }
+
+        if (err.type === 'peer-unavailable') {
+          const match = err.message && err.message.match(/PTTNET_[A-Z0-9-]+_S\d+/);
+          if (match) {
+            cleanupPending(match[0]);
+          }
+        }
+      });
+    }
+
+    function cleanupPending(remoteId) {
+      const pending = pendingOutbound.get(remoteId);
+      if (pending) {
+        if (pending.conn) pending.conn.close();
+        if (pending.call) pending.call.close();
+        pendingOutbound.delete(remoteId);
+      }
+    }
+
+    function setupPeerListeners() {
+      peer.on('connection', (conn) => {
+        const slotMatch = conn.peer.match(/_S(\d+)$/);
+        const fallbackSlot = slotMatch ? parseInt(slotMatch[1], 10) : 0;
+        registerDataConnection(conn, fallbackSlot);
+      });
+
+      peer.on('call', (call) => {
+        call.answer(localStream);
+        bindIncomingCall(call.peer, call);
+      });
+
+      peer.on('disconnected', () => {
+        netStatus.textContent = 'RECONNECTING';
+        ledDot.className = 'led-dot busy';
+        if (peer && !peer.destroyed) {
+          peer.reconnect();
+        }
+      });
+    }
+
+    function connectToPeer(targetId, targetSlot) {
+      if (activePeers.has(targetId) || pendingOutbound.has(targetId)) return;
+
+      const conn = peer.connect(targetId, { reliable: true });
+      const call = peer.call(targetId, localStream);
+
+      pendingOutbound.set(targetId, { conn, call });
+
+      registerDataConnection(conn, targetSlot);
+      if (call) {
+        bindIncomingCall(targetId, call);
+      }
+    }
+
+    function getOrCreateActivePeer(remoteId, fallbackSlot = 0) {
+      if (!activePeers.has(remoteId)) {
+        activePeers.set(remoteId, {
+          conn: null,
+          call: null,
+          callsign: `UNIT-0${fallbackSlot || '?'}`,
+          slot: fallbackSlot
+        });
+      }
+      return activePeers.get(remoteId);
+    }
+
+    function registerDataConnection(conn, fallbackSlot = 0) {
+      const remoteId = conn.peer;
+
+      conn.on('open', () => {
+        pendingOutbound.delete(remoteId);
+        const entry = getOrCreateActivePeer(remoteId, fallbackSlot);
+        if (entry.conn && entry.conn !== conn && entry.conn.open) {
+          entry.conn.close();
+        }
+        entry.conn = conn;
+
+        conn.send({
+          type: 'HELLO',
+          callsign: myCallsign,
+          slot: mySlot
+        });
+
+        renderRoster();
+      });
+
+      conn.on('data', (data) => {
+        if (!data || typeof data !== 'object') return;
+        const entry = getOrCreateActivePeer(remoteId, fallbackSlot);
+
+        if (data.type === 'HELLO') {
+          entry.callsign = data.callsign || entry.callsign;
+          entry.slot = data.slot || entry.slot;
+          renderRoster();
+        } else if (data.type === 'TX_START') {
+          activeSpeakerPeerId = remoteId;
+          const speakerName = data.callsign || entry.callsign || 'UNIT';
+          statusBanner.textContent = `RX // ${speakerName} BICARA...`;
+          statusBanner.className = 'status-banner rx-active';
+          ledDot.className = 'led-dot busy';
+
+          if (!isTransmitting) {
+            pttBtn.classList.add('locked-rx');
+            pttSubtext.textContent = 'SALURAN SIBUK';
+          }
+
+          if (rxSafetyTimer) clearTimeout(rxSafetyTimer);
+          rxSafetyTimer = setTimeout(() => {
+            if (activeSpeakerPeerId === remoteId) {
+              resetRxState();
+            }
+          }, 30000);
+
+          playRadioTone('start');
+          renderRoster();
+        } else if (data.type === 'TX_END') {
+          if (activeSpeakerPeerId === remoteId) {
+            playRadioTone('roger');
+            resetRxState();
+          }
+        }
+      });
+
+      conn.on('close', () => {
+        cleanupPending(remoteId);
+        removePeer(remoteId, true);
+      });
+
+      conn.on('error', () => {
+        cleanupPending(remoteId);
+        removePeer(remoteId, true);
+      });
+    }
+
+    function bindIncomingCall(remoteId, call) {
+      call.on('stream', (remoteStream) => {
+        pendingOutbound.delete(remoteId);
+        const slotMatch = remoteId.match(/_S(\d+)$/);
+        const fallbackSlot = slotMatch ? parseInt(slotMatch[1], 10) : 0;
+        const entry = getOrCreateActivePeer(remoteId, fallbackSlot);
+
+        if (entry.call && entry.call !== call) {
+          entry.call.close();
+        }
+        entry.call = call;
+
+        let audioEl = document.getElementById(`audio_${remoteId}`);
+        if (!audioEl) {
+          audioEl = document.createElement('audio');
+          audioEl.id = `audio_${remoteId}`;
+          audioEl.autoplay = true;
+          audioEl.playsInline = true;
+          audioPool.appendChild(audioEl);
+        }
+        audioEl.srcObject = remoteStream;
+        audioEl.play().catch(() => {});
+
+        renderRoster();
+      });
+
+      call.on('close', () => {
+        cleanupPending(remoteId);
+        removePeer(remoteId, true);
+      });
+
+      call.on('error', () => {
+        cleanupPending(remoteId);
+      });
+    }
+
+    function removePeer(remoteId, shouldRender = true) {
+      const entry = activePeers.get(remoteId);
+      if (entry) {
+        if (entry.conn && entry.conn.open) entry.conn.close();
+        if (entry.call) entry.call.close();
+        activePeers.delete(remoteId);
+      }
+
+      const audioEl = document.getElementById(`audio_${remoteId}`);
+      if (audioEl) audioEl.remove();
+
+      if (activeSpeakerPeerId === remoteId) {
+        resetRxState();
+      } else if (shouldRender) {
+        renderRoster();
+      }
+    }
+
+    function renderRoster() {
+      const totalUnits = activePeers.size + 1;
+      memberCountDisplay.textContent = `${totalUnits} UNIT AKTIF`;
+
+      rosterBox.innerHTML = '';
+
+      const selfChip = document.createElement('div');
+      selfChip.className = 'member-chip self' + (isTransmitting ? ' speaking' : '');
+      selfChip.textContent = `${myCallsign} (KAMU)`;
+      rosterBox.appendChild(selfChip);
+
+      activePeers.forEach((info, remoteId) => {
+        const chip = document.createElement('div');
+        const isSpeaking = activeSpeakerPeerId === remoteId;
+        chip.className = 'member-chip' + (isSpeaking ? ' speaking' : '');
+        chip.textContent = info.callsign || 'UNIT';
+        rosterBox.appendChild(chip);
+      });
+    }
+
+    function broadcastData(payload) {
+      activePeers.forEach((info) => {
+        if (info.conn && info.conn.open) {
+          info.conn.send(payload);
+        }
+      });
+    }
+
+    function startTalking(e) {
+      if (e) e.preventDefault();
+      if (pttBtn.disabled || isTransmitting || activeSpeakerPeerId) return;
+
+      isTransmitting = true;
+      setMicActive(true);
+      pttBtn.classList.add('transmitting');
+      pttSubtext.textContent = 'MENGUDARA (TX)';
+      ledDot.className = 'led-dot tx';
+      statusBanner.textContent = `TX // MENGIRIM KE ${activePeers.size} UNIT...`;
+      statusBanner.className = 'status-banner tx-active';
+      playRadioTone('start');
+      renderRoster();
+
+      broadcastData({
+        type: 'TX_START',
+        callsign: myCallsign,
+        slot: mySlot
+      });
+    }
+
+    function stopTalking(e) {
+      if (e) e.preventDefault();
+      if (!isTransmitting) return;
+
+      isTransmitting = false;
+      setMicActive(false);
+      pttBtn.classList.remove('transmitting');
+      pttSubtext.textContent = 'PUSH TO TALK';
+      ledDot.className = 'led-dot online';
+      statusBanner.textContent = 'STANDBY - SALURAN AMAN';
+      statusBanner.className = 'status-banner';
+      playRadioTone('roger');
+      renderRoster();
+
+      broadcastData({
+        type: 'TX_END',
+        callsign: myCallsign,
+        slot: mySlot
+      });
+    }
+
+    function updatePresetHighlight(ch) {
+      presetBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.ch === ch);
+      });
+    }
+
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        channelInput.value = btn.dataset.ch;
+        joinChannel(btn.dataset.ch);
+      });
+    });
+
+    joinBtn.addEventListener('click', () => {
+      joinChannel(channelInput.value);
+    });
+
+    pttBtn.addEventListener('touchstart', startTalking, { passive: false });
+    pttBtn.addEventListener('touchend', stopTalking, { passive: false });
+    pttBtn.addEventListener('touchcancel', stopTalking, { passive: false });
+    pttBtn.addEventListener('mousedown', startTalking);
+    window.addEventListener('mouseup', stopTalking);
+    pttBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && isTransmitting) {
+        stopTalking();
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
+      if (isTransmitting) stopTalking();
+      leaveCurrentChannel();
+    });
+  </script>
+</body>
+</html>
